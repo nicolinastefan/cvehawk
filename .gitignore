@@ -4,4 +4,4 @@ __pycache__/
 .env
 storage/scans/*.xml
 !storage/scans/.gitkeep
-.claude/
+
