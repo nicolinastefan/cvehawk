@@ -12,7 +12,13 @@ from app.parser import parse_nmap_xml
 from app.cpe_matcher import resolve_cpe
 from app.nvd_client import query_cves_by_cpe
 
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
+from fastapi import Request
+
 app = FastAPI(title="CVEHawk")
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
+templates = Jinja2Templates(directory="app/templates")
 
 STORAGE_DIR = "storage/scans"
 
@@ -171,5 +177,11 @@ def get_scan(scan_id: str, severity: str = "high_critical", db: Session = Depend
     return result
 
 @app.get("/")
-def root():
-    return {"status": "CVEHawk is running"}
+def root(request: Request):
+    return templates.TemplateResponse(request, "dashboard.html", {"scan": None})
+
+
+@app.get("/dashboard/{scan_id}")
+def dashboard(scan_id: str, request: Request, severity: str = "high_critical", db: Session = Depends(get_db)):
+    scan_data = get_scan(scan_id, severity, db)
+    return templates.TemplateResponse(request, "dashboard.html", {"scan": scan_data})

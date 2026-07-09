@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CVEHawk</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="page">
+    <div class="prompt-line">vulnerability scanner</div>
+    <header class="masthead">
+      <h1>CVEHawk</h1>
+      <div class="tagline">turn an nmap scan into a list of things to actually worry about</div>
+    </header>
+    <hr class="rule">
+
+    <div class="upload-panel">
+      <div class="label-line">Upload nmap XML</div>
+      <form action="/scans" method="post" enctype="multipart/form-data" onsubmit="return handleUpload(event)">
+        <input type="file" id="file" name="file" accept=".xml" required>
+        <button type="submit">Run scan</button>
+      </form>
+    </div>
+
+    {% if scan %}
+      <form method="get" action="/dashboard/{{ scan.scan_id }}" class="filter-line">
+        <span>Severity</span>
+        <select name="severity" onchange="this.form.submit()">
+          <option value="high_critical" {% if scan.severity_filter == "high_critical" %}selected{% endif %}>high+critical</option>
+          <option value="all" {% if scan.severity_filter == "all" %}selected{% endif %}>all</option>
+          <option value="critical" {% if scan.severity_filter == "critical" %}selected{% endif %}>critical</option>
+          <option value="high" {% if scan.severity_filter == "high" %}selected{% endif %}>high</option>
+          <option value="medium" {% if scan.severity_filter == "medium" %}selected{% endif %}>medium</option>
+          <option value="low" {% if scan.severity_filter == "low" %}selected{% endif %}>low</option>
+        </select>
+      </form>
+
+      {% for host in scan.hosts %}
+        <div class="host-block">
+          <div><span class="host-title">{{ host.ip_address }}</span> <span class="host-meta">{{ host.hostname or "" }} &middot; {{ host.state }}</span></div>
+
+          {% for service in host.services %}
+            <div class="service-block">
+              <div class="service-line">
+                <span class="service-port">{{ service.port }}/{{ service.protocol }}</span>
+                <span class="service-product">{{ service.product or "unknown" }}</span>
+                {% if service.version %}<span class="service-version">{{ service.version }}</span>{% endif %}
+              </div>
+
+              {% if service.cve_matches %}
+                {% for finding in service.cve_matches %}
+                  {% set pct = ((finding.cvss_score or 0) / 10 * 100) | round | int %}
+                  <div class="finding-row sev-{{ (finding.severity or 'unknown')|lower }}">
+                    <span class="bar-chart"><span class="bar-chart-fill" style="width: {{ pct }}%"></span></span>
+                    <span class="cvss-score">{{ "%.1f"|format(finding.cvss_score) if finding.cvss_score else "?.?" }}</span>
+                    <span class="severity-tag sev-{{ (finding.severity or 'unknown')|lower }}">{{ finding.severity or "unknown" }}</span>
+                    <span class="cve-id">{{ finding.cve_id }}</span>
+                    <span class="confidence-tag">{{ finding.confidence }}</span>
+                  </div>
+                {% endfor %}
+              {% else %}
+                <div class="no-findings">nothing found at this severity level</div>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">No scan yet — upload an nmap XML file above to get started.</div>
+    {% endif %}
+  </div>
+
+  <script>
+    async function handleUpload(event) {
+      event.preventDefault();
+      const form = event.target;
+      const formData = new FormData(form);
+      const response = await fetch('/scans', { method: 'POST', body: formData });
+      const data = await response.json();
+      if (data.scan_id) {
+        window.location.href = '/dashboard/' + data.scan_id;
+      } else {
+        alert('Upload failed: ' + JSON.stringify(data));
+      }
+      return false;
+    }
+  </script>
+</body>
+</html>
