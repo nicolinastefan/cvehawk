@@ -185,3 +185,57 @@ def root(request: Request):
 def dashboard(scan_id: str, request: Request, severity: str = "high_critical", db: Session = Depends(get_db)):
     scan_data = get_scan(scan_id, severity, db)
     return templates.TemplateResponse(request, "dashboard.html", {"scan": scan_data})
+
+
+from fastapi.responses import Response
+
+
+@app.get("/scans/{scan_id}/export")
+def export_scan_markdown(scan_id: str, severity: str = "high_critical", db: Session = Depends(get_db)):
+    scan_data = get_scan(scan_id, severity, db)
+
+    lines = []
+    lines.append(f"# CVEHawk Scan Report")
+    lines.append("")
+    lines.append(f"**File:** {scan_data['filename']}  ")
+    lines.append(f"**Uploaded:** {scan_data['uploaded_at']}  ")
+    lines.append(f"**Severity filter:** {scan_data['severity_filter']}")
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+
+    for host in scan_data["hosts"]:
+        lines.append(f"## Host: {host['ip_address']}")
+        if host["hostname"]:
+            lines.append(f"**Hostname:** {host['hostname']}  ")
+        lines.append(f"**State:** {host['state']}")
+        lines.append("")
+
+        for service in host["services"]:
+            version_str = f" ({service['version']})" if service["version"] else ""
+            lines.append(f"### {service['port']}/{service['protocol']} — {service['product'] or 'unknown'}{version_str}")
+            lines.append("")
+
+            if service["cve_matches"]:
+                lines.append("| CVE ID | CVSS | Severity | Confidence |")
+                lines.append("|---|---|---|---|")
+                for finding in service["cve_matches"]:
+                    score = finding["cvss_score"] if finding["cvss_score"] is not None else "?"
+                    lines.append(f"| {finding['cve_id']} | {score} | {finding['severity']} | {finding['confidence']} |")
+                lines.append("")
+            else:
+                lines.append("_No findings at this severity level._")
+                lines.append("")
+
+        lines.append("---")
+        lines.append("")
+
+    markdown_content = "\n".join(lines)
+
+    return Response(
+        content=markdown_content,
+        media_type="text/markdown",
+        headers={
+            "Content-Disposition": f'attachment; filename="cvehawk_report_{scan_id[:8]}.md"'
+        },
+    )
