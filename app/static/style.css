@@ -292,6 +292,18 @@ button:focus-visible, select:focus-visible, a:focus-visible {
   content: "🐦‍⬛ ";
 }
 
+.export-link {
+  color: var(--amber);
+  text-decoration: none;
+  border: 1px solid var(--amber-dim);
+  padding: 5px 10px;
+  font-size: 13px;
+}
+
+.export-link:hover {
+  background: var(--amber-faint);
+}
+
 @media (max-width: 600px) {
   .finding-row { white-space: normal; flex-wrap: wrap; }
   .bar-chart { min-width: auto; }

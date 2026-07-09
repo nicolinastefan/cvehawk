@@ -24,8 +24,8 @@
     </div>
 
     {% if scan %}
-      <form method="get" action="/dashboard/{{ scan.scan_id }}" class="filter-line">
-        <span>Severity</span>
+<form method="get" action="/dashboard/{{ scan.scan_id }}" class="filter-line">
+        <span>&gt; severity filter:</span>
         <select name="severity" onchange="this.form.submit()">
           <option value="high_critical" {% if scan.severity_filter == "high_critical" %}selected{% endif %}>high+critical</option>
           <option value="all" {% if scan.severity_filter == "all" %}selected{% endif %}>all</option>
@@ -34,8 +34,8 @@
           <option value="medium" {% if scan.severity_filter == "medium" %}selected{% endif %}>medium</option>
           <option value="low" {% if scan.severity_filter == "low" %}selected{% endif %}>low</option>
         </select>
+        <a href="/scans/{{ scan.scan_id }}/export?severity={{ scan.severity_filter }}" class="export-link">[ export .md ]</a>
       </form>
-
       {% for host in scan.hosts %}
         <div class="host-block">
           <div><span class="host-title">{{ host.ip_address }}</span> <span class="host-meta">{{ host.hostname or "" }} &middot; {{ host.state }}</span></div>
