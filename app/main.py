@@ -102,15 +102,40 @@ def upload_scan(file: UploadFile = File(...), db: Session = Depends(get_db)):
 
 
 @app.get("/scans/{scan_id}")
-def get_scan(scan_id: str, db: Session = Depends(get_db)):
+def get_scan(scan_id: str, severity: str = "high_critical", db: Session = Depends(get_db)):
+    """
+    severity options:
+      - "high_critical" (default) -- only HIGH and CRITICAL findings
+      - "all" -- everything
+      - "critical", "high", "medium", "low" -- a single severity level
+    """
     scan = db.query(Scan).filter(Scan.id == scan_id).first()
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
+
+    severity = severity.lower()
+    valid_options = {"high_critical", "all", "critical", "high", "medium", "low"}
+    if severity not in valid_options:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid severity filter. Choose from: {', '.join(sorted(valid_options))}",
+        )
+
+    def matches_filter(match_severity: str | None) -> bool:
+        if match_severity is None:
+            return False
+        match_severity = match_severity.lower()
+        if severity == "all":
+            return True
+        if severity == "high_critical":
+            return match_severity in ("high", "critical")
+        return match_severity == severity
 
     result = {
         "scan_id": str(scan.id),
         "filename": scan.filename,
         "uploaded_at": str(scan.uploaded_at),
+        "severity_filter": severity,
         "hosts": [],
     }
 
@@ -122,26 +147,28 @@ def get_scan(scan_id: str, db: Session = Depends(get_db)):
             "services": [],
         }
         for service in host.services:
+            filtered_matches = [
+                {
+                    "cve_id": m.cve_id,
+                    "cvss_score": m.cvss_score,
+                    "severity": m.severity,
+                    "confidence": m.confidence,
+                }
+                for m in service.cve_matches
+                if matches_filter(m.severity)
+            ]
+
             service_data = {
                 "port": service.port,
                 "protocol": service.protocol,
                 "product": service.product,
                 "version": service.version,
-                "cve_matches": [
-                    {
-                        "cve_id": m.cve_id,
-                        "cvss_score": m.cvss_score,
-                        "severity": m.severity,
-                        "confidence": m.confidence,
-                    }
-                    for m in service.cve_matches
-                ],
+                "cve_matches": filtered_matches,
             }
             host_data["services"].append(service_data)
         result["hosts"].append(host_data)
 
     return result
-
 
 @app.get("/")
 def root():
